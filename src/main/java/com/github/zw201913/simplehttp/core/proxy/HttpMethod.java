@@ -347,40 +347,39 @@ public class HttpMethod {
                 }
                 continue;
             }
-            if (Objects.equals(parameterPart, ParameterType.ParameterPart.NONE)) {
-                if (ClassUtils.isSimpleType(type)) {
-                    String logstr = methodName + "方法请求参数不合规则";
-                    log.error(logstr);
-                    throw new IllegalArgumentException(logstr);
-                }
-                if (Objects.equals(type, Map.class)) {
-                    Map<String, Object> map = (Map<String, Object>) arg;
-                    data.putAll(map);
-                } else if (Objects.equals(type, Collection.class)) {
-                    log.warn(methodName + "方法不支持没注解的" + type.getName() + "类型");
-                } else {
-                    handleObject(arg, data, headers, handlers, true);
-                }
-            } else if (Objects.equals(parameterPart, ParameterType.ParameterPart.HEADER)) {
+            if (Objects.equals(parameterPart, ParameterType.ParameterPart.HEADER)) {
                 String key = parameterType.getKey();
                 if (StringUtils.isBlank(key)) {
                     if (ClassUtils.isSimpleType(type)) {
                         String logstr = methodName + "方法的Header参数缺少指定的key值";
                         log.error(logstr);
                         throw new IllegalArgumentException(logstr);
+                    }
+                    if (Objects.equals(type, Map.class)) {
+                        Map<String, String> map = (Map<String, String>) arg;
+                        headers.putAll(map);
+                    } else if (Objects.equals(type, Collection.class)) {
+                        log.warn(methodName + "方法不支持没注解的" + type.getName() + "类型");
                     } else {
                         handleObject(arg, data, headers, handlers, false);
                     }
                 } else {
                     headers.put(key, CastUtils.castString(arg));
                 }
-            } else if (Objects.equals(parameterPart, ParameterType.ParameterPart.FIELD)) {
+            } else if (Objects.equals(parameterPart, ParameterType.ParameterPart.FIELD)
+                    || Objects.equals(parameterPart, ParameterType.ParameterPart.NONE)) {
                 String key = parameterType.getKey();
                 if (StringUtils.isBlank(key)) {
                     if (ClassUtils.isSimpleType(type)) {
                         String logstr = methodName + "方法的Field参数缺少指定的key值";
                         log.error(logstr);
                         throw new IllegalArgumentException(logstr);
+                    }
+                    if (Objects.equals(type, Map.class)) {
+                        Map<String, Object> map = (Map<String, Object>) arg;
+                        data.putAll(map);
+                    } else if (Objects.equals(type, Collection.class)) {
+                        log.warn(methodName + "方法不支持没注解的" + type.getName() + "类型");
                     } else {
                         handleObject(arg, data, headers, handlers, true);
                     }
