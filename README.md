@@ -2,6 +2,16 @@
 java发送http请求的简单使用
 最近自己写了一个发送http请求的组件，整个发送请求的实现是用的Okhttp，只是基于Okhttp基础上做了再次封装，使用起来和mybatis一样，只需要编写接口即可，业务层就可以直接调用，并且可以和spring集成。可以用于调用第三方API或者爬虫。
 
+maven依赖
+```
+        <dependency>
+            <groupId>com.github.zw201913</groupId>
+            <artifactId>simple-http</artifactId>
+            <version>1.0.0.RELEASE</version>
+        </dependency>
+```
+
+### spring boot
 **1.下面来直接看看怎么和springboot集成：**
 ```
 import com.github.zw201913.simplehttp.annotation.EnableSimpleHttp;
