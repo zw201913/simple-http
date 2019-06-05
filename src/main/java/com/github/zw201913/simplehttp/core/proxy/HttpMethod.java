@@ -2,6 +2,7 @@ package com.github.zw201913.simplehttp.core.proxy;
 
 import com.github.zw201913.simplehttp.annotation.Field;
 import com.github.zw201913.simplehttp.annotation.Header;
+import com.github.zw201913.simplehttp.annotation.Url;
 import com.github.zw201913.simplehttp.core.factory.BaseOkHttpClientFactory;
 import com.github.zw201913.simplehttp.core.handler.FormDataJsonRequestParamsHandler;
 import com.github.zw201913.simplehttp.core.handler.RequestParamsHandler;
@@ -17,6 +18,8 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.Callback;
 import okhttp3.Response;
+import okhttp3.WebSocket;
+import okhttp3.WebSocketListener;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
@@ -37,6 +40,8 @@ public class HttpMethod {
     private static final String CALLBACK = "CALLBACK";
     private static final String PROGRESS_LISTENER = "PROGRESS_LISTENER";
     private static final String RESPONSE_HANDLER = "RESPONSE_HANDLER";
+    private static final String URL = "URL";
+    private static final String WEB_SOCKET_LISTENER = "WEB_SOCKET_LISTENER";
 
     private final Method method;
     private final HttpProxy httpProxy;
@@ -47,11 +52,11 @@ public class HttpMethod {
         this.method = method;
         this.httpProxy = httpProxy;
         this.httpMethodType = httpMethodType;
-        headleHeader();
+        headleFieldAnnotation();
     }
 
     /** 处理参数上的注解 */
-    private void headleHeader() {
+    private void headleFieldAnnotation() {
         Parameter[] parameters = method.getParameters();
         if (Objects.isNull(parameters) || parameters.length <= 0) {
             return;
@@ -61,34 +66,50 @@ public class HttpMethod {
             Class<?> type = parameter.getType();
             Header header = parameter.getDeclaredAnnotation(Header.class);
             Field field = parameter.getDeclaredAnnotation(Field.class);
+            Url url = parameter.getDeclaredAnnotation(Url.class);
             // 没有Header和Field注解
-            if (Objects.isNull(header) && Objects.isNull(field)) {
-                ParameterType parameterType = new ParameterType();
-                parameterType.setIndex(i);
-                parameterType.setType(type);
-                parameterType.setKey(StringUtils.EMPTY);
-                parameterType.setParameterPart(ParameterType.ParameterPart.NONE);
-                parameterTypes.add(parameterType);
+            if (Objects.isNull(header) && Objects.isNull(field) && Objects.isNull(url)) {
+                parameterTypes.add(
+                        newParameterType(
+                                i, type, StringUtils.EMPTY, ParameterType.ParameterPart.NONE));
             }
             // Header注解
             if (!Objects.isNull(header)) {
-                ParameterType parameterType = new ParameterType();
-                parameterType.setIndex(i);
-                parameterType.setType(type);
-                parameterType.setKey(header.value());
-                parameterType.setParameterPart(ParameterType.ParameterPart.HEADER);
-                parameterTypes.add(parameterType);
+                parameterTypes.add(
+                        newParameterType(
+                                i, type, header.value(), ParameterType.ParameterPart.HEADER));
             }
             // Field注解
             if (!Objects.isNull(field)) {
-                ParameterType parameterType = new ParameterType();
-                parameterType.setIndex(i);
-                parameterType.setType(type);
-                parameterType.setKey(field.value());
-                parameterType.setParameterPart(ParameterType.ParameterPart.FIELD);
-                parameterTypes.add(parameterType);
+                parameterTypes.add(
+                        newParameterType(
+                                i, type, field.value(), ParameterType.ParameterPart.FIELD));
+            }
+            if (!Objects.isNull(url)) {
+                parameterTypes.add(
+                        newParameterType(
+                                i, type, StringUtils.EMPTY, ParameterType.ParameterPart.URL));
             }
         }
+    }
+
+    /**
+     * 创建ParameterType
+     *
+     * @param index
+     * @param type
+     * @param key
+     * @param parameterPart
+     * @return
+     */
+    private ParameterType newParameterType(
+            int index, Class<?> type, String key, ParameterType.ParameterPart parameterPart) {
+        ParameterType parameterType = new ParameterType();
+        parameterType.setIndex(index);
+        parameterType.setType(type);
+        parameterType.setKey(key);
+        parameterType.setParameterPart(parameterPart);
+        return parameterType;
     }
 
     /**
@@ -115,30 +136,54 @@ public class HttpMethod {
         Callback callback = (Callback) handlers.get(CALLBACK);
         ProgressListener progressListener = (ProgressListener) handlers.get(PROGRESS_LISTENER);
         ResponseHandler responseHandler = (ResponseHandler) handlers.get(RESPONSE_HANDLER);
+        String url = CastUtils.castString(handlers.get(URL));
+
+        HttpMethodType.MethodType methodType = httpMethodType.getMethodType();
 
         Object result = null;
-        if (Objects.equals(httpMethodType.getMethodType(), HttpMethodType.MethodType.GET)) {
+        if (Objects.equals(methodType, HttpMethodType.MethodType.GET)) {
             // get请求
-            result = handleGetHttp(headers, params, files, callback, progressListener);
-        } else if (Objects.equals(httpMethodType.getMethodType(), HttpMethodType.MethodType.HEAD)) {
+            result = handleGetHttp(url, headers, params, files, callback, progressListener);
+        } else if (Objects.equals(methodType, HttpMethodType.MethodType.HEAD)) {
             // head请求
-            result = handleHeadHttp(headers, params, files, callback, progressListener);
-        } else if (Objects.equals(httpMethodType.getMethodType(), HttpMethodType.MethodType.POST)) {
+            result = handleHeadHttp(url, headers, params, files, callback, progressListener);
+        } else if (Objects.equals(methodType, HttpMethodType.MethodType.POST)) {
             // post请求
-            result = handlePostHttp(headers, params, files, callback, progressListener);
-        } else if (Objects.equals(httpMethodType.getMethodType(), HttpMethodType.MethodType.PUT)) {
+            result = handlePostHttp(url, headers, params, files, callback, progressListener);
+        } else if (Objects.equals(methodType, HttpMethodType.MethodType.PUT)) {
             // put请求
-            result = handlePutHttp(headers, params, files, callback, progressListener);
-        } else if (Objects.equals(
-                httpMethodType.getMethodType(), HttpMethodType.MethodType.PATCH)) {
+            result = handlePutHttp(url, headers, params, files, callback, progressListener);
+        } else if (Objects.equals(methodType, HttpMethodType.MethodType.PATCH)) {
             // patch请求
-            result = handlePatchHttp(headers, params, files, callback, progressListener);
-        } else if (Objects.equals(
-                httpMethodType.getMethodType(), HttpMethodType.MethodType.DELETE)) {
+            result = handlePatchHttp(url, headers, params, files, callback, progressListener);
+        } else if (Objects.equals(methodType, HttpMethodType.MethodType.DELETE)) {
             // delete请求
-            result = handleDeleteHttp(headers, params, files, callback, progressListener);
+            result = handleDeleteHttp(url, headers, params, files, callback, progressListener);
+        } else if (Objects.equals(methodType, HttpMethodType.MethodType.WS)) {
+            // websocket
+            WebSocketListener listener = (WebSocketListener) handlers.get(WEB_SOCKET_LISTENER);
+            result = handleWebSocket(url, listener);
         }
         return handleResult(result, responseHandler);
+    }
+
+    /**
+     * 处理Websocket方法
+     *
+     * @param url
+     * @param listener
+     * @return
+     */
+    private WebSocket handleWebSocket(String url, WebSocketListener listener) {
+        String realUrl = StringUtils.isBlank(url) ? httpMethodType.getUrl() : url;
+        if (StringUtils.isBlank(realUrl)) {
+            throw new IllegalArgumentException("请求url不能为空");
+        }
+        if (Objects.isNull(listener)) {
+            throw new IllegalArgumentException("需要设置一个WebSocketListener");
+        }
+        BaseOkHttpClientFactory okHttpClientFactory = httpMethodType.getOkHttpClientFactory();
+        return HttpUtils.newWebSocket(okHttpClientFactory, realUrl, listener);
     }
 
     /**
@@ -152,6 +197,16 @@ public class HttpMethod {
     private Object handleResult(Object result, ResponseHandler responseHandler) throws Exception {
         Class<?> returnType = method.getReturnType();
         String methodName = method.getName();
+        // 如果是wensocket
+        if (Objects.equals(returnType, WebSocket.class)) {
+            if (result instanceof WebSocket) {
+                return result;
+            } else {
+                String logstr = methodName + "方法的返回类型和真实返回值类型不同";
+                log.error(logstr);
+                throw new IllegalArgumentException(logstr);
+            }
+        }
         /** 如果返回类型是Response */
         if (Objects.equals(returnType, Response.class)) {
             if (!(result instanceof Response)) {
@@ -203,6 +258,7 @@ public class HttpMethod {
         enum ParameterPart {
             HEADER,
             FIELD,
+            URL,
             NONE
         }
     }
@@ -282,6 +338,15 @@ public class HttpMethod {
                 }
                 continue;
             }
+            if (Objects.equals(type, WebSocketListener.class)) {
+                Object webSocketListener = handlers.get(WEB_SOCKET_LISTENER);
+                if (Objects.isNull(webSocketListener)) {
+                    handlers.put(WEB_SOCKET_LISTENER, arg);
+                } else {
+                    log.warn("存在多个WebSocketListener，只有最后一个会生效");
+                }
+                continue;
+            }
             if (Objects.equals(parameterPart, ParameterType.ParameterPart.NONE)) {
                 if (ClassUtils.isSimpleType(type)) {
                     String logstr = methodName + "方法请求参数不合规则";
@@ -294,7 +359,7 @@ public class HttpMethod {
                 } else if (Objects.equals(type, Collection.class)) {
                     log.warn(methodName + "方法不支持没注解的" + type.getName() + "类型");
                 } else {
-                    handleObject(arg, data, headers, true);
+                    handleObject(arg, data, headers, handlers, true);
                 }
             } else if (Objects.equals(parameterPart, ParameterType.ParameterPart.HEADER)) {
                 String key = parameterType.getKey();
@@ -304,7 +369,7 @@ public class HttpMethod {
                         log.error(logstr);
                         throw new IllegalArgumentException(logstr);
                     } else {
-                        handleObject(arg, data, headers, false);
+                        handleObject(arg, data, headers, handlers, false);
                     }
                 } else {
                     headers.put(key, CastUtils.castString(arg));
@@ -317,10 +382,16 @@ public class HttpMethod {
                         log.error(logstr);
                         throw new IllegalArgumentException(logstr);
                     } else {
-                        handleObject(arg, data, headers, true);
+                        handleObject(arg, data, headers, handlers, true);
                     }
                 } else {
                     data.put(key, args[index]);
+                }
+            } else if (Objects.equals(parameterPart, ParameterType.ParameterPart.URL)) {
+                if (ClassUtils.isString(type)) {
+                    handlers.put(URL, arg);
+                } else {
+                    log.warn(methodName + "方法@Url指定的类型必须是String类型");
                 }
             }
         }
@@ -335,7 +406,11 @@ public class HttpMethod {
      * @param header
      */
     private void handleObject(
-            Object arg, Map<String, Object> data, Map<String, String> header, boolean isField)
+            Object arg,
+            Map<String, Object> data,
+            Map<String, String> header,
+            Map<String, Object> handlers,
+            boolean isField)
             throws IllegalAccessException {
         Class<?> clazz = arg.getClass();
         java.lang.reflect.Field[] fields = clazz.getDeclaredFields();
@@ -357,6 +432,12 @@ public class HttpMethod {
                     name = key;
                 }
                 header.put(name, CastUtils.castString(value));
+            } else if (field.isAnnotationPresent(Url.class)) {
+                if (ClassUtils.isString(field.getType())) {
+                    handlers.put(URL, value);
+                } else {
+                    log.warn(name + "字段被@Url注解必须要是String类型");
+                }
             } else {
                 if (isField) {
                     data.put(name, value);
@@ -376,6 +457,7 @@ public class HttpMethod {
      * @return
      */
     private Object handleGetHttp(
+            String url,
             Map<String, String> headers,
             Map<String, Object> params,
             Map<String, File[]> files,
@@ -383,6 +465,7 @@ public class HttpMethod {
             ProgressListener progressListener)
             throws IOException {
         return handleSimpleHttp(
+                url,
                 headers,
                 params,
                 files,
@@ -392,6 +475,7 @@ public class HttpMethod {
     }
 
     private Object handlePostHttp(
+            String url,
             Map<String, String> headers,
             Map<String, Object> params,
             Map<String, File[]> files,
@@ -399,6 +483,7 @@ public class HttpMethod {
             ProgressListener progressListener)
             throws IOException {
         return handleHttp(
+                url,
                 headers,
                 params,
                 files,
@@ -408,6 +493,7 @@ public class HttpMethod {
     }
 
     private Object handlePutHttp(
+            String url,
             Map<String, String> headers,
             Map<String, Object> params,
             Map<String, File[]> files,
@@ -415,6 +501,7 @@ public class HttpMethod {
             ProgressListener progressListener)
             throws IOException {
         return handleHttp(
+                url,
                 headers,
                 params,
                 files,
@@ -424,6 +511,7 @@ public class HttpMethod {
     }
 
     private Object handleHeadHttp(
+            String url,
             Map<String, String> headers,
             Map<String, Object> params,
             Map<String, File[]> files,
@@ -431,6 +519,7 @@ public class HttpMethod {
             ProgressListener progressListener)
             throws IOException {
         return handleSimpleHttp(
+                url,
                 headers,
                 params,
                 files,
@@ -440,6 +529,7 @@ public class HttpMethod {
     }
 
     private Object handleDeleteHttp(
+            String url,
             Map<String, String> headers,
             Map<String, Object> params,
             Map<String, File[]> files,
@@ -447,6 +537,7 @@ public class HttpMethod {
             ProgressListener progressListener)
             throws IOException {
         return handleHttp(
+                url,
                 headers,
                 params,
                 files,
@@ -456,6 +547,7 @@ public class HttpMethod {
     }
 
     private Object handlePatchHttp(
+            String url,
             Map<String, String> headers,
             Map<String, Object> params,
             Map<String, File[]> files,
@@ -463,6 +555,7 @@ public class HttpMethod {
             ProgressListener progressListener)
             throws IOException {
         return handleHttp(
+                url,
                 headers,
                 params,
                 files,
@@ -472,6 +565,7 @@ public class HttpMethod {
     }
 
     private Object handleSimpleHttp(
+            String url,
             Map<String, String> headers,
             Map<String, Object> params,
             Map<String, File[]> files,
@@ -479,9 +573,9 @@ public class HttpMethod {
             ProgressListener progressListener,
             HttpFactory httpFactory)
             throws IOException {
-        String url = httpMethodType.getUrl();
+        String realUrl = StringUtils.isBlank(url) ? httpMethodType.getUrl() : url;
         BaseOkHttpClientFactory okHttpClientFactory = httpMethodType.getOkHttpClientFactory();
-        if (StringUtils.isBlank(url)) {
+        if (StringUtils.isBlank(realUrl)) {
             throw new IllegalArgumentException("请求url不能为空");
         }
         if (!CollectionUtils.isEmpty(files)) {
@@ -493,14 +587,15 @@ public class HttpMethod {
         AbstractHttp http = httpFactory.newHttp(okHttpClientFactory);
 
         if (Objects.isNull(callback)) {
-            return http.send(url, headers, params);
+            return http.send(realUrl, headers, params);
         } else {
-            http.sendAsync(url, headers, params, callback);
+            http.sendAsync(realUrl, headers, params, callback);
             return null;
         }
     }
 
     private Object handleHttp(
+            String url,
             Map<String, String> headers,
             Map<String, Object> params,
             Map<String, File[]> files,
@@ -508,10 +603,10 @@ public class HttpMethod {
             ProgressListener progressListener,
             HttpFactory httpFactory)
             throws IOException {
-        String url = httpMethodType.getUrl();
+        String realUrl = StringUtils.isBlank(url) ? httpMethodType.getUrl() : url;
         BaseOkHttpClientFactory okHttpClientFactory = httpMethodType.getOkHttpClientFactory();
         Class<? extends RequestParamsHandler> handlerClass = httpMethodType.getHandlerClass();
-        if (StringUtils.isBlank(url)) {
+        if (StringUtils.isBlank(realUrl)) {
             throw new IllegalArgumentException("请求url不能为空");
         }
         AbstractHttp http = httpFactory.newHttp(okHttpClientFactory);
@@ -521,9 +616,9 @@ public class HttpMethod {
         }
         http.handler(handlerClass);
         if (Objects.isNull(callback)) {
-            return http.send(url, headers, params, files, progressListener);
+            return http.send(realUrl, headers, params, files, progressListener);
         } else {
-            http.sendAsync(url, headers, params, files, progressListener, callback);
+            http.sendAsync(realUrl, headers, params, files, progressListener, callback);
             return null;
         }
     }

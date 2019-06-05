@@ -4,6 +4,7 @@ import com.github.zw201913.simplehttp.core.factory.BaseOkHttpClientFactory;
 import com.github.zw201913.simplehttp.core.factory.DefaultOkHttpClientFactory;
 import com.github.zw201913.simplehttp.core.handler.RequestParamsHandler;
 import com.github.zw201913.simplehttp.core.handler.SimpleJsonRequestParamsHandler;
+import org.apache.commons.lang3.StringUtils;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -19,7 +20,7 @@ public @interface Post {
      *
      * @return
      */
-    String value();
+    String value() default StringUtils.EMPTY;
 
     /**
      * 指定创建OkHttpClient的工厂类

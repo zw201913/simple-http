@@ -126,6 +126,13 @@ public class HttpProxy<T> implements InvocationHandler, Serializable {
                         cacheOkHttpClientFactory(patch.clientFactory()),
                         patch.handler(),
                         HttpMethodType.MethodType.PATCH);
+            } else if (Objects.equals(clazz, Ws.class)) {
+                Ws ws = method.getDeclaredAnnotation(Ws.class);
+                return new HttpMethodType(
+                        ws.value(),
+                        cacheOkHttpClientFactory(ws.clientFactory()),
+                        null,
+                        HttpMethodType.MethodType.WS);
             }
         }
         return null;

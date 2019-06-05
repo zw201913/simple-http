@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
 
 /** 注解请求体参数 */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.PARAMETER)
+@Target({ElementType.PARAMETER, ElementType.FIELD})
 public @interface Field {
     /**
      * 请求参数对应的key值

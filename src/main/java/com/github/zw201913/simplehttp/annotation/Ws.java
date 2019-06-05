@@ -9,13 +9,13 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** 注解Get请求方法 */
+/** webSocket请求 */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface Get {
+public @interface Ws {
 
     /**
-     * 请求url
+     * url
      *
      * @return
      */

@@ -27,6 +27,11 @@ public abstract class AbstractHttp {
         this.okHttpClientFactory = okHttpClientFactory;
     }
 
+    /**
+     * 创建OkHttpClient
+     *
+     * @return
+     */
     public OkHttpClient okHttpClient() {
         return okHttpClientFactory.okHttpClient();
     }
@@ -45,6 +50,9 @@ public abstract class AbstractHttp {
             Map<String, Object> params,
             Map<String, File[]> files,
             ProgressListener progressListener) {
+        if (Objects.equals(this.getClass(), WebSocketFactory.class)) {
+            throw new RuntimeException("WebSocket请求方式错误");
+        }
         return okHttpClient().newCall(newRequest(url, headers, params, files, progressListener));
     }
     /**

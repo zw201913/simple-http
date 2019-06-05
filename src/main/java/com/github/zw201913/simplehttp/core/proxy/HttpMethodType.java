@@ -23,6 +23,7 @@ public class HttpMethodType {
         POST,
         PUT,
         DELETE,
-        PATCH
+        PATCH,
+        WS
     }
 }

@@ -11,6 +11,8 @@ import com.google.common.collect.Table;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.Callback;
 import okhttp3.Response;
+import okhttp3.WebSocket;
+import okhttp3.WebSocketListener;
 
 import java.io.File;
 import java.io.IOException;
@@ -91,6 +93,8 @@ public final class HttpUtils {
                 return new PatchHttp(okHttpClientFactory);
             } else if (Objects.equals(methodType, MethodType.HEAD)) {
                 return new HeadHttp(okHttpClientFactory);
+            } else if (Objects.equals(methodType, MethodType.WS)) {
+                return new WebSocketFactory(okHttpClientFactory);
             }
             return null;
         }
@@ -101,7 +105,8 @@ public final class HttpUtils {
             PUT,
             DELETE,
             PATCH,
-            HEAD
+            HEAD,
+            WS
         }
     }
 
@@ -113,6 +118,27 @@ public final class HttpUtils {
     public static void registeRequestParamsHandler(
             Class<? extends RequestParamsHandler> handlerClass) {
         PostHttp.registeRequestParamsHandler(handlerClass);
+    }
+
+    /**
+     * 创建默认的WebSocketFactory
+     *
+     * @return
+     */
+    public static WebSocketFactory webSocket() {
+        return webSocket(DefaultSingleOkHttpClient.OK_HTTP_CLIENT_FACTORY);
+    }
+
+    /**
+     * 创建WebSocketFactory
+     *
+     * @param okHttpClientFactory
+     * @return
+     */
+    public static WebSocketFactory webSocket(BaseOkHttpClientFactory okHttpClientFactory) {
+        return (WebSocketFactory)
+                DefaultSingleOkHttpClient.cache(
+                        okHttpClientFactory, DefaultSingleOkHttpClient.MethodType.WS);
     }
     /**
      * 获取默认的GetHttp
@@ -238,6 +264,29 @@ public final class HttpUtils {
         return (HeadHttp)
                 DefaultSingleOkHttpClient.cache(
                         okHttpClientFactory, DefaultSingleOkHttpClient.MethodType.HEAD);
+    }
+
+    /**
+     * 创建默认的WebSocket
+     *
+     * @param url
+     * @param listener
+     * @return
+     */
+    public static WebSocket newWebSocket(String url, WebSocketListener listener) {
+        return newWebSocket(DefaultSingleOkHttpClient.OK_HTTP_CLIENT_FACTORY, url, listener);
+    }
+    /**
+     * 创建WebSocket
+     *
+     * @param factory
+     * @param url
+     * @param listener
+     * @return
+     */
+    public static WebSocket newWebSocket(
+            BaseOkHttpClientFactory factory, String url, WebSocketListener listener) {
+        return webSocket(factory).createWebSocket(url, listener);
     }
 
     /**
